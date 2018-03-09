@@ -18,7 +18,7 @@ def load_config():
     default_config = ConfigParser()
     default_config[name] = {
         "min_delay": "5.0",
-        "pulsetime": "30.0"
+        "pulsetime": "10.0"
     }
 
     return _load_config(name, default_config)

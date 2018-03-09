@@ -19,7 +19,7 @@ function! s:Poke()
 endfunc
 
 function! s:StartVimWatcher()
-        let s:vimwatcher_job = job_start("python3 -u vimwatcher.py",
+        let s:vimwatcher_job = job_start("python3 -u" . expand("<sfile>:p:h") . "vimwatcher.py",
                                 \ {"out_cb": "AWRecv",
                                 \ "in_mode": "json"
                                 \})
