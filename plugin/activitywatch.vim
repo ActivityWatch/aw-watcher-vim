@@ -8,6 +8,7 @@ let s:cpo_save = &cpo
 set cpo&vim
 
 let s:vimwatcher_open = 0
+let s:adapter_cmd = "python3 -u " . expand("<sfile>:p:h") . "/vimwatcher.py"
 
 function! s:Poke()
         let s:number_of_moves += 1
@@ -19,15 +20,17 @@ function! s:Poke()
 endfunc
 
 function! s:StartVimWatcher()
-        let s:vimwatcher_job = job_start("python3 -u" . expand("<sfile>:p:h") . "vimwatcher.py",
-                                \ {"out_cb": "AWRecv",
-                                \ "in_mode": "json"
-                                \})
-        let s:vimwatcher_last = 0
-        let s:number_of_moves = 0
-        let s:vimwatcher_open = 1
-        let s:vimwatcher_conf = {'min_delay': 1000}
-        call s:Send("config")
+        if !exists("s:vimwatcher_job") || !s:CheckStatus()
+                let s:vimwatcher_job = job_start(s:adapter_cmd,
+                                        \ {"out_cb": "AWRecv",
+                                        \ "in_mode": "json"
+                                        \})
+                let s:vimwatcher_last = 0
+                let s:number_of_moves = 0
+                let s:vimwatcher_open = 1
+                let s:vimwatcher_conf = {'min_delay': 1000}
+                call s:Send("config")
+        endif
 endfunc
 
 function! s:StopVimWatcher()
@@ -48,14 +51,21 @@ function! AWEcho(channel, msg)
         echo a:msg
 endfunc
 
-function! s:Send(msg)
+function! s:CheckStatus()
         if s:vimwatcher_open
                 if ch_status(s:vimwatcher_job) == "open"
-                        call ch_sendexpr(s:vimwatcher_job, a:msg)
+                        return 1
                 else
                         let s:vimwatcher_open = 0
                         echo "Watcher has stopped unexpectedly"
                 endif
+        endif
+        return 0
+endfunc
+
+function! s:Send(msg)
+        if s:CheckStatus()
+                call ch_sendexpr(s:vimwatcher_job, a:msg)
         else
                 echo "Watcher not running"
         endif
@@ -70,6 +80,7 @@ endfunc
 call s:StartVimWatcher()
 
 augroup ActivityWatch
+        autocmd BufEnter * call s:StartVimWatcher()
         autocmd CursorMoved,CursorMovedI * call s:Poke()
 augroup END
 
