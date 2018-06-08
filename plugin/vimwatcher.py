@@ -11,6 +11,9 @@ from aw_client.client import ActivityWatchClient
 name = "aw-watcher-vim"
 logger = logging.getLogger(name)
 
+#client_logger = logging.getLogger("aw_client")
+#client_logger.setLevel(40)
+
 
 def load_config():
     from configparser import ConfigParser
@@ -39,20 +42,25 @@ def main():
 
     aw = ActivityWatchClient(name, testing=False)
     bucketname = "{}_{}".format(aw.client_name, aw.client_hostname)
-    aw.setup_bucket(bucketname, 'currently-editing')
+    aw.create_bucket(bucketname, 'currently-editing', queued=True)
     aw.connect()
 
     i = 1
+    logger.info("Starting read loop")
     for chunk in sys.stdin:
+        logger.info("A")
         i, data = json.loads(chunk)
         if data == "stop":
             break
         elif data == "config":
             send("config", {"min_delay": min_delay})
         elif data:
+            logger.info("Sending heartbeat")
             timestamp = datetime.utcfromtimestamp(data.pop("timestamp"))
             event = Event(timestamp=timestamp, data=data)
             aw.heartbeat(bucketname, event, pulsetime=pulsetime, queued=True)
+        else:
+            logger.info("Test")
 
 
 main()
