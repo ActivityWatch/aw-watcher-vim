@@ -42,7 +42,7 @@ def main():
 
     aw = ActivityWatchClient(name, testing=False)
     bucketname = "{}_{}".format(aw.client_name, aw.client_hostname)
-    aw.create_bucket(bucketname, 'currently-editing', queued=True)
+    aw.create_bucket(bucketname, 'app.editor.current-activity', queued=True)
     aw.connect()
 
     i = 1
