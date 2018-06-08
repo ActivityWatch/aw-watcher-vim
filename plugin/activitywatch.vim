@@ -11,12 +11,7 @@ let s:vimwatcher_open = 0
 let s:adapter_cmd = ['python3', '-u', expand("<sfile>:p:h") . '/vimwatcher.py']
 
 function! s:Poke()
-        let s:number_of_moves += 1
-        if (localtime() - s:vimwatcher_last) >= s:vimwatcher_conf['min_delay'] && s:vimwatcher_open
-                call s:SendData()
-                let s:vimwatcher_last = localtime()
-                let s:number_of_moves = 0
-        endif
+        call s:SendData()
 endfunc
 
 function! s:StartVimWatcher()
@@ -36,11 +31,7 @@ function! s:StartVimWatcher()
                                                 \})
                 endif
 
-                let s:vimwatcher_last = 0
-                let s:number_of_moves = 0
                 let s:vimwatcher_open = 1
-                let s:vimwatcher_conf = {'min_delay': 1000}
-                call s:Send("config")
         endif
 endfunc
 
@@ -62,11 +53,7 @@ endfunc
 
 function! s:HandleMsg(msg)
         let l:json_msg = json_decode(a:msg)
-        if json_msg[0] == "config"
-                let s:vimwatcher_conf = json_msg[1]
-        else
-                echo json_msg
-        endif
+        echo json_msg
 endfunc
 
 function! AWEcho(channel, msg)
@@ -129,7 +116,6 @@ else
         command! AWStatus echom ch_status(s:vimwatcher_job)
 endif
 command! AWStop  call s:StopVimWatcher()
-command! AWConf  call s:Send("config")
 
 let &cpo = s:cpo_save
 unlet s:cpo_save
