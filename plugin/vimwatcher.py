@@ -20,7 +20,6 @@ def load_config():
     from aw_core.config import load_config as _load_config
     default_config = ConfigParser()
     default_config[name] = {
-        "min_delay": "5.0",
         "pulsetime": "10.0"
     }
 
@@ -37,7 +36,6 @@ def main():
     config_dir = dirs.get_config_dir(name)
 
     config = load_config()
-    min_delay = config[name].getfloat("min_delay")
     pulsetime = config[name].getfloat("pulsetime")
 
     aw = ActivityWatchClient(name, testing=False)
@@ -50,8 +48,6 @@ def main():
         i, data = json.loads(chunk)
         if data == "stop":
             break
-        elif data == "config":
-            send("config", {"min_delay": min_delay})
         elif data:
             timestamp = datetime.utcfromtimestamp(data.pop("timestamp"))
             event = Event(timestamp=timestamp, data=data)
