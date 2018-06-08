@@ -24,13 +24,6 @@ def load_config():
     return _load_config(name, default_config)
 
 
-def get_vim_data():
-    data = {
-        # 'file': vim.current.buffer.name
-    }
-    return data
-
-
 def send(h, content):
     msg = json.dumps([h, content])
     print(msg)
