@@ -1,12 +1,13 @@
 import logging
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 from aw_core import dirs
 from aw_core.models import Event
 from aw_client.client import ActivityWatchClient
 
+logging.basicConfig(level=logging.INFO)
 
 name = "aw-watcher-vim"
 logger = logging.getLogger(name)
@@ -32,7 +33,6 @@ def send(h, content):
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
     config_dir = dirs.get_config_dir(name)
 
     config = load_config()
@@ -40,18 +40,21 @@ def main():
 
     aw = ActivityWatchClient(name, testing=False)
     bucketname = "{}_{}".format(aw.client_name, aw.client_hostname)
-    aw.create_bucket(bucketname, 'app.editor.current-activity', queued=True)
+    aw.create_bucket(bucketname, 'app.editor.activity', queued=True)
     aw.connect()
 
-    i = 1
     for chunk in sys.stdin:
-        i, data = json.loads(chunk)
-        if data == "stop":
-            break
-        elif data:
-            timestamp = datetime.utcfromtimestamp(data.pop("timestamp"))
-            event = Event(timestamp=timestamp, data=data)
+        msg = json.loads(chunk)
+        if "action" not in msg:
+            logger.error("No action in msg: {}".format(msg))
+        if msg["action"] == "stop":
+            aw.disconnect()
+            return
+        elif msg["action"] == "update":
+            timestamp = datetime.now(timezone.utc)
+            event = Event(timestamp=timestamp, data=msg["data"])
             aw.heartbeat(bucketname, event, pulsetime=pulsetime, queued=True)
-
+        else:
+            logger.error("Invalid action: {}".format(msg["action"]))
 
 main()

@@ -7,99 +7,72 @@ let g:loaded_activitywatch = 1
 let s:cpo_save = &cpo
 set cpo&vim
 
-let s:vimwatcher_open = 0
-let s:adapter_cmd = ['python3', '-u', expand("<sfile>:p:h") . '/vimwatcher.py']
-
-function! s:Poke()
-        call s:SendData()
-endfunc
+let s:adapter_cmd = ['python3', expand("<sfile>:p:h") . '/vimwatcher.py']
 
 function! s:StartVimWatcher()
         if !exists("s:vimwatcher_job") || !s:CheckStatus()
                 if has('nvim')
                         let s:vimwatcher_job = jobstart(s:adapter_cmd,
-                                                \ {"on_stdout": "AWNeovimRecv",
-                                                \ "on_stderr": "AWNeovimEcho",
-                                                \ "on_exit": "AWNeovimExit"
-                                                \})
+                                    \ {"on_stdout": "AWNeovimEcho",
+                                    \  "on_stderr": "AWNeovimEcho",
+                                    \  "on_exit": "AWNeovimExit"
+                                    \ })
                 else
                         let s:vimwatcher_job = job_start(s:adapter_cmd,
-                                                \ {"out_cb": "AWRecv",
-                                                \ "err_io": "buffer",
-                                                \ "err_name": "activtywatch_log",
-                                                \ "in_mode": "json"
-                                                \})
+                                    \ {"out_cb": "AWEcho",
+                                    \  "err_cb": "AWEcho",
+                                    \  "in_mode": "raw"
+                                    \ })
                 endif
-
-                let s:vimwatcher_open = 1
         endif
-endfunc
-
-function! AWNeovimExit(job_id, data, event)
-        call s:CloseWatcher()
-endfunc
-
-function! AWNeovimRecv(job_id, data, event)
-        call s:HandleMsg(a:data)
 endfunc
 
 function! AWNeovimEcho(job_id, data, event)
         echo a:data
 endfunc
-
-function! AWRecv(channel, msg)
-        call s:HandleMsg(a:msg)
-endfunc
-
-function! s:HandleMsg(msg)
-        let l:json_msg = json_decode(a:msg)
-        echo json_msg
-endfunc
-
 function! AWEcho(channel, msg)
         echo a:msg
 endfunc
 
+function! AWNeovimExit(job_id, data, event)
+        let s:vimwatcher_job = 0
+endfunc
+
 function! s:CheckStatus()
-        if s:vimwatcher_open
-                if has('nvim')
+        if has('nvim')
+                if s:vimwatcher_job
                         return 1
-                elseif ch_status(s:vimwatcher_job) == "open"
-                        return 1
-                else
-                        call s:CloseWatcher()
-                        echo "Watcher has stopped unexpectedly"
                 endif
+        elseif ch_status(s:vimwatcher_job) == "open"
+                return 1
         endif
         return 0
 endfunc
 
 function! s:StopVimWatcher()
-        call s:Send("stop")
-        call s:CloseWatcher()
-endfunc
-
-function! s:CloseWatcher()
-        let s:vimwatcher_open = 0
+        if has('nvim')
+                call s:Send({'action': 'stop'})
+                call jobwait([s:vimwatcher_job], 5)
+                let s:vimwatcher_job = 0
+        else
+                call job_stop(s:vimwatcher_job)
+        endif
 endfunc
 
 function! s:Send(msg)
         if s:CheckStatus()
                 if has('nvim')
                         let l:json_msg = json_encode(a:msg)
-                        call jobsend(s:vimwatcher_job, l:json_msg)
+                        call jobsend(s:vimwatcher_job, l:json_msg . "\n")
                 else
-                        call ch_sendexpr(s:vimwatcher_job, a:msg)
+                        let l:json_msg = json_encode(a:msg)
+                        call ch_sendraw(s:vimwatcher_job, l:json_msg . "\n")
                 endif
-        else
-                echo "Watcher not running"
         endif
 endfunc
 
-function! s:SendData()
-        call s:Send({'timestamp': localtime(),
-                                \ 'fname': expand('%:p')
-                                \})
+function! s:Poke()
+        call s:Send({'action': 'update', 'data': {'filename': expand('%:p')}})
 endfunc
 
 call s:StartVimWatcher()
@@ -110,11 +83,7 @@ augroup ActivityWatch
 augroup END
 
 command! AWStart call s:StartVimWatcher()
-if has('nvim')
-        command! AWStatus echom s:CheckStatus()
-else
-        command! AWStatus echom ch_status(s:vimwatcher_job)
-endif
+command! AWStatus echom s:CheckStatus()
 command! AWStop  call s:StopVimWatcher()
 
 let &cpo = s:cpo_save
