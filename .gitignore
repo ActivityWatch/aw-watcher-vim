@@ -1,2 +1,4 @@
 *.swp
 *.mypy_cache
+
+startup.profile
