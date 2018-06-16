@@ -15,7 +15,6 @@ function! s:StartVimWatcher()
                         let s:vimwatcher_job = jobstart(s:adapter_cmd,
                                     \ {"on_stdout": "AWNeovimEcho",
                                     \  "on_stderr": "AWNeovimEcho",
-                                    \  "on_exit": "AWNeovimExit"
                                     \ })
                 else
                         let s:vimwatcher_job = job_start(s:adapter_cmd,
@@ -34,10 +33,6 @@ function! AWEcho(channel, msg)
         echo a:msg
 endfunc
 
-function! AWNeovimExit(job_id, data, event)
-        let s:vimwatcher_job = 0
-endfunc
-
 function! s:CheckStatus()
         if has('nvim')
                 if s:vimwatcher_job
@@ -51,8 +46,7 @@ endfunc
 
 function! s:StopVimWatcher()
         if has('nvim')
-                call s:Send({'action': 'stop'})
-                call jobwait([s:vimwatcher_job], 5)
+                call jobstop(s:vimwatcher_job)
                 let s:vimwatcher_job = 0
         else
                 call job_stop(s:vimwatcher_job)

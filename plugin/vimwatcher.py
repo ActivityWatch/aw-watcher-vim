@@ -47,9 +47,6 @@ def main():
         msg = json.loads(chunk)
         if "action" not in msg:
             logger.error("No action in msg: {}".format(msg))
-        if msg["action"] == "stop":
-            aw.disconnect()
-            return
         elif msg["action"] == "update":
             timestamp = datetime.now(timezone.utc)
             event = Event(timestamp=timestamp, data=msg["data"])
