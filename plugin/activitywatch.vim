@@ -68,7 +68,7 @@ function! s:Poke()
         call s:Send({
         \   'action': 'update',
         \   'data': {
-        \       'filename': expand('%:p'),
+        \       'file': expand('%:p'),
         \       'language': &filetype,
         \       'project': getcwd()
         \}})
