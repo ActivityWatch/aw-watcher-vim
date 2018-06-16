@@ -65,7 +65,13 @@ function! s:Send(msg)
 endfunc
 
 function! s:Poke()
-        call s:Send({'action': 'update', 'data': {'filename': expand('%:p'), 'language': &filetype}})
+        call s:Send({
+        \   'action': 'update',
+        \   'data': {
+        \       'filename': expand('%:p'),
+        \       'language': &filetype,
+        \       'project': getcwd()
+        \}})
 endfunc
 
 call s:StartVimWatcher()
