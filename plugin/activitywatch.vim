@@ -61,11 +61,10 @@ endfunc
 
 function! s:Send(msg)
         if s:CheckStatus()
+                let l:json_msg = json_encode(a:msg)
                 if has('nvim')
-                        let l:json_msg = json_encode(a:msg)
                         call jobsend(s:vimwatcher_job, l:json_msg . "\n")
                 else
-                        let l:json_msg = json_encode(a:msg)
                         call ch_sendraw(s:vimwatcher_job, l:json_msg . "\n")
                 endif
         endif

@@ -21,7 +21,7 @@ def load_config():
     from aw_core.config import load_config as _load_config
     default_config = ConfigParser()
     default_config[name] = {
-        "pulsetime": "10.0"
+        "pulsetime": "20.0"
     }
 
     return _load_config(name, default_config)
@@ -53,7 +53,7 @@ def main():
         elif msg["action"] == "update":
             timestamp = datetime.now(timezone.utc)
             event = Event(timestamp=timestamp, data=msg["data"])
-            aw.heartbeat(bucketname, event, pulsetime=pulsetime, queued=True)
+            aw.heartbeat(bucketname, event, pulsetime=pulsetime, queued=True, commit_interval=3)
         else:
             logger.error("Invalid action: {}".format(msg["action"]))
 
