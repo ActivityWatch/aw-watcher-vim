@@ -3,17 +3,14 @@ import json
 import sys
 from datetime import datetime, timezone
 
-from aw_core import dirs
+from aw_core.log import setup_logging
 from aw_core.models import Event
 from aw_client.client import ActivityWatchClient
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 name = "aw-watcher-vim"
-logger = logging.getLogger(name)
-
-client_logger = logging.getLogger("aw_client")
-client_logger.setLevel(logging.WARNING)
 
 
 def load_config():
@@ -32,13 +29,16 @@ def send(h, content):
     print(msg)
 
 
-def main():
-    config_dir = dirs.get_config_dir(name)
+def main(testing=False):
+    client_logger = logging.getLogger("aw_client")
+    if not testing:
+        client_logger.setLevel(logging.WARNING)
+    setup_logging(name, testing=testing, log_stderr=True, log_file=testing)
 
     config = load_config()
     pulsetime = config[name].getfloat("pulsetime")
 
-    aw = ActivityWatchClient(name, testing=False)
+    aw = ActivityWatchClient(name, testing=testing)
     bucketname = "{}_{}".format(aw.client_name, aw.client_hostname)
     aw.create_bucket(bucketname, 'app.editor.activity', queued=True)
     aw.connect()
@@ -54,4 +54,6 @@ def main():
         else:
             logger.error("Invalid action: {}".format(msg["action"]))
 
-main()
+
+if __name__ == "__main__":
+    main()
