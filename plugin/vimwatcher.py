@@ -35,6 +35,10 @@ def main(testing=False):
         client_logger.setLevel(logging.WARNING)
     setup_logging(name, testing=testing, log_stderr=True, log_file=testing)
 
+    # change back log level changed in setup_logging(), see issue #8
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO if testing else logging.WARNING)
+
     config = load_config()
     pulsetime = config[name].getfloat("pulsetime")
 
