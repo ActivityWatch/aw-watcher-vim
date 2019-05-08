@@ -1,3 +1,11 @@
+if exists("g:loaded_activitywatch")
+        finish
+endif
+let g:loaded_activitywatch = 1
+
+" compatibility mode which set this script to run with default vim settings
+let s:save_cpo = &cpo
+set cpo&vim
 
 let s:last_heartbeat = localtime()
 let s:file = ''
@@ -113,10 +121,14 @@ function! s:Heartbeat()
 endfunc
 
 augroup ActivityWatch
-        autocmd CursorMoved,CursorMovedI * call s:Heartbeat()
+    autocmd BufEnter * call AWStart()
+    autocmd CursorMoved,CursorMovedI * call s:Heartbeat()
 augroup END
 
 command! AWHeartbeat call s:Heartbeat()
 command! AWStart call AWStart()
 command! AWStop call AWStop()
+command! AWStatus echom printf('aw-watcher-vim running: %b', s:connected)
 
+" reset compatibility mode
+let &cpo = s:save_cpo
