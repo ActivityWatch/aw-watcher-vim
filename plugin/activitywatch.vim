@@ -1,89 +1,62 @@
-if exists("g:loaded_activitywatch")
-        finish
-endif
 
-let g:loaded_activitywatch = 1
+let s:last_heartbeat = localtime()
+let s:file = ''
+let s:language = ''
+let s:project = ''
 
-let s:cpo_save = &cpo
-set cpo&vim
+function! s:Poke()
+    let l:duration = 0
+    let l:localtime = localtime()
+    let l:timestamp = strftime('%FT%H:%M:%S%z')
+    let l:file = expand('%p')
+    let l:language = &filetype
+    let l:project = getcwd()
+    if    s:file != l:file ||
+        \ s:language != l:language ||
+        \ s:project != l:project ||
+        \ l:localtime - s:last_heartbeat > 1
 
-let s:adapter_cmd = ['python3', expand("<sfile>:p:h") . '/vimwatcher.py']
-
-function! s:StartVimWatcher()
-        if !exists("s:vimwatcher_job") || !s:CheckStatus()
-                if has('nvim')
-                        let s:vimwatcher_job = jobstart(s:adapter_cmd,
-                                    \ {"on_stdout": "AWNeovimEcho",
-                                    \  "on_stderr": "AWNeovimEcho",
-                                    \ })
-                else
-                        let s:vimwatcher_job = job_start(s:adapter_cmd,
-                                    \ {"out_cb": "AWEcho",
-                                    \  "err_cb": "AWEcho",
-                                    \  "in_mode": "raw"
-                                    \ })
-                endif
-        endif
+        let l:curl_cmd = ['curl', '-s',
+            \ '127.0.0.1:5666/api/0/buckets/aw-watcher-web-firefox/heartbeat?pulsetime=10',
+            \ '-H', 'Content-Type: application/json',
+            \ '-X', 'POST']
+        let l:req_body = {
+            \ 'duration': 0,
+            \ 'timestamp': l:timestamp,
+            \ 'data': {
+                \ 'file': l:file,
+                \ 'language': l:language,
+                \ 'project': l:project
+            \ }
+        \}
+        let l:req = l:curl_cmd
+        call add(l:req, "-d")
+        call add(l:req, json_encode(l:req_body))
+        "echom json_encode(l:req)
+        call jobstart(l:req,
+    \ {"on_stdout": "AWNeovimEcho",
+    \  "on_stderr": "AWNeovimEcho",
+    \ })
+        let s:file = l:file
+        let s:language = l:language
+        let s:project = l:project
+        let s:last_heartbeat = l:localtime
+    endif
 endfunc
 
 function! AWNeovimEcho(job_id, data, event)
+    if a:data != ['']
         echo a:data
+    endif
 endfunc
+
 function! AWEcho(channel, msg)
         echo a:msg
 endfunc
 
-function! s:CheckStatus()
-        if has('nvim')
-                if s:vimwatcher_job
-                        return 1
-                endif
-        elseif ch_status(s:vimwatcher_job) == "open"
-                return 1
-        endif
-        return 0
-endfunc
-
-function! s:StopVimWatcher()
-        if has('nvim')
-                call jobstop(s:vimwatcher_job)
-                let s:vimwatcher_job = 0
-        else
-                call job_stop(s:vimwatcher_job)
-        endif
-endfunc
-
-function! s:Send(msg)
-        if s:CheckStatus()
-                let l:json_msg = json_encode(a:msg)
-                if has('nvim')
-                        call jobsend(s:vimwatcher_job, l:json_msg . "\n")
-                else
-                        call ch_sendraw(s:vimwatcher_job, l:json_msg . "\n")
-                endif
-        endif
-endfunc
-
-function! s:Poke()
-        call s:Send({
-        \   'action': 'update',
-        \   'data': {
-        \       'file': expand('%:p'),
-        \       'language': &filetype,
-        \       'project': getcwd()
-        \}})
-endfunc
-
-call s:StartVimWatcher()
-
 augroup ActivityWatch
-        autocmd BufEnter * call s:StartVimWatcher()
         autocmd CursorMoved,CursorMovedI * call s:Poke()
 augroup END
 
-command! AWStart call s:StartVimWatcher()
-command! AWStatus echom s:CheckStatus()
-command! AWStop  call s:StopVimWatcher()
+command! AWPoke call s:Poke()
 
-let &cpo = s:cpo_save
-unlet s:cpo_save

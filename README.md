@@ -5,13 +5,8 @@ Work in progress, contributing with bug reports on the GitHub issues page is app
 
 ### Installation
 
-If you don't already have the activitywatch python client library, install with
+This plugin depends on curl, so make sure that it's installed and available in yout PATH
 
-```
-pip3 install git+https://github.com/ActivityWatch/aw-core.git
-pip3 install git+https://github.com/ActivityWatch/aw-client.git
-```
-
-Make sure that you have some vim runtimepath manager set up (such as Pathogen or Vundle)
+It is recommended to have a vim runtime manager to make it easier to install (such as Pathogen or Vundle)
 
 Then simply clone this repository to the bundle folder in your vim config folder (usually `~/.vim/bundle` or `~/.config/nvim/bundle` for neovim)
