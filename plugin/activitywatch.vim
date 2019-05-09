@@ -13,7 +13,7 @@ let s:language = ''
 let s:project = ''
 
 let s:connected = 0
-let s:base_apiurl = '127.0.0.1:5600/api/0'
+let s:base_apiurl = 'http://127.0.0.1:5600/api/0'
 let s:hostname = hostname()
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
 let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucketname)
@@ -29,7 +29,7 @@ function! s:HTTPPostJson(url, data)
         \ '-X', 'POST',
         \ '-d', json_encode(a:data),
         \ '-o', '/dev/null',
-        \ '-w', "%{stderr}%{http_code}"]
+        \ '-w', "%{http_code}"]
     let l:req_job = jobstart(l:req,
         \ {"on_stdout": "s:HTTPPostOnStdout",
         \  "on_stderr": "s:HTTPPostOnStderr",
@@ -57,15 +57,17 @@ function! s:HTTPPostOnExit(jobid, exitcode, eventtype)
 endfunc
 
 function! s:HTTPPostOnStdout(jobid, data, event)
-    "let l:jobid_str = printf('%d', a:jobid)
-    "echo printf('aw-watcher-vim job %d stdout: %s', a:jobid, json_encode(a:data))
+    if a:data != ['']
+        let l:jobid_str = printf('%d', a:jobid)
+        let s:http_response_code[l:jobid_str] = a:data
+        "echo printf('aw-watcher-vim job %d stdout: %s', a:jobid, json_encode(a:data))
+    endif
 endfunc
 
 function! s:HTTPPostOnStderr(jobid, data, event)
     if a:data != ['']
         let l:jobid_str = printf('%d', a:jobid)
-        let s:http_response_code[l:jobid_str] = a:data
-        "echo printf('aw-watcher-vim job %d stderr: %s', a:jobid, a:data)
+        "echo printf('aw-watcher-vim job %d stderr: %s', a:jobid, json_encode(a:data))
     endif
 endfunc
 
