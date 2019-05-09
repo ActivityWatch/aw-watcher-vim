@@ -7,6 +7,8 @@ let g:loaded_activitywatch = 1
 let s:save_cpo = &cpo
 set cpo&vim
 
+let s:nvim = has('nvim')
+
 let s:last_heartbeat = localtime()
 let s:file = ''
 let s:language = ''
@@ -23,51 +25,68 @@ let s:heartbeat_apiurl = printf('%s/heartbeat?pulsetime=10', s:bucket_apiurl)
 " the key is the jobid and the value the HTTP status code
 let s:http_response_code = {}
 
-function! s:HTTPPostJson(url, data)
+function! HTTPPostJson(url, data)
     let l:req = ['curl', '-s', a:url,
         \ '-H', 'Content-Type: application/json',
         \ '-X', 'POST',
         \ '-d', json_encode(a:data),
         \ '-o', '/dev/null',
         \ '-w', "%{http_code}"]
-    let l:req_job = jobstart(l:req,
-        \ {"on_stdout": "s:HTTPPostOnStdout",
-        \  "on_stderr": "s:HTTPPostOnStderr",
-        \  "on_exit": "s:HTTPPostOnExit",
-    \ })
-    call jobwait([l:req_job])
+    if s:nvim
+        let l:req_job = jobstart(l:req,
+            \ {"on_stdout": "HTTPPostOnStdoutNeovim",
+            \  "on_exit": "HTTPPostOnExitNeovim",
+        \ })
+    else
+        let l:req_job = job_start(l:req,
+            \ {"out_cb": "HTTPPostOnStdoutVim",
+            \  "close_cb": "HTTPPostOnExitVim",
+            \  "in_mode": "raw",
+        \ })
+    endif
 endfunc
 
-function! s:HTTPPostOnExit(jobid, exitcode, eventtype)
+function! HTTPPostOnExitNeovim(jobid, exitcode, eventtype)
     let l:jobid_str = printf('%d', a:jobid)
     let l:status_code = str2nr(s:http_response_code[l:jobid_str][0])
-    if l:status_code == 0
+    call HTTPPostOnExit(l:jobid_str, l:status_code)
+endfunc
+
+function! HTTPPostOnExitVim(jobmsg)
+    " cut out channelnum from string 'channel X running'
+    let l:jobid_str = substitute(a:jobmsg, '[ A-Za-z]*', '', "g")
+    let l:status_code = str2nr(s:http_response_code[l:jobid_str])
+    call HTTPPostOnExit(l:jobid_str, l:status_code)
+endfunc
+
+function! HTTPPostOnExit(jobid_str, status_code)
+    if a:status_code == 0
         " We cannot connect to aw-server
-        echoerr "aw-watcher-vim: Failed to send requests to aw-server, logging will be disabled. You can retry to connect with ':AWStart'"
+        echoerr "aw-watcher-vim: Failed to connect to aw-server, logging will be disabled. You can retry to connect with ':AWStart'"
         let s:connected = 0
-    elseif l:status_code >= 100 && l:status_code < 300 || l:status_code == 304
+    elseif a:status_code >= 100 && a:status_code < 300 || a:status_code == 304
         " We are connected!
         let s:connected = 1
     else
         " aw-server didn't like our request
-        echoerr printf("aw-watcher-vim: aw-server did not accept our request with status code %d. See aw-server logs for reason or stop aw-watcher-vim with :AWStop", l:status_code)
+        echoerr printf("aw-watcher-vim: aw-server did not accept our request with status code %d. See aw-server logs for reason or stop aw-watcher-vim with :AWStop", a:status_code)
     endif
     " Cleanup response code
-    unlet s:http_response_code[l:jobid_str]
+    unlet s:http_response_code[a:jobid_str]
 endfunc
 
-function! s:HTTPPostOnStdout(jobid, data, event)
+function! HTTPPostOnStdoutVim(jobmsg, data)
+    " cut out channelnum from string 'channel X running'
+    let l:jobid_str = substitute(a:jobmsg, '[ A-Za-z]*', '', "g")
+    let s:http_response_code[l:jobid_str] = a:data
+    "echo printf('aw-watcher-vim job %d stdout: %s', l:jobid_str, json_encode(a:data))
+endfunc
+
+function! HTTPPostOnStdoutNeovim(jobid, data, event)
     if a:data != ['']
         let l:jobid_str = printf('%d', a:jobid)
         let s:http_response_code[l:jobid_str] = a:data
         "echo printf('aw-watcher-vim job %d stdout: %s', a:jobid, json_encode(a:data))
-    endif
-endfunc
-
-function! s:HTTPPostOnStderr(jobid, data, event)
-    if a:data != ['']
-        let l:jobid_str = printf('%d', a:jobid)
-        "echo printf('aw-watcher-vim job %d stderr: %s', a:jobid, json_encode(a:data))
     endif
 endfunc
 
@@ -78,7 +97,7 @@ function! s:CreateBucket()
         \ 'client': 'aw-watcher-vim',
         \ 'type': 'app.editor'
     \}
-    call s:HTTPPostJson(s:bucket_apiurl, l:body)
+    call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
 
 function! s:Heartbeat()
@@ -108,7 +127,7 @@ function! s:Heartbeat()
                 \ 'project': l:project
             \ }
         \}
-        call s:HTTPPostJson(s:heartbeat_apiurl, l:req_body)
+        call HTTPPostJson(s:heartbeat_apiurl, l:req_body)
         let s:file = l:file
         let s:language = l:language
         let s:project = l:project
