@@ -1,89 +1,157 @@
 if exists("g:loaded_activitywatch")
         finish
 endif
-
 let g:loaded_activitywatch = 1
 
-let s:cpo_save = &cpo
+" compatibility mode which set this script to run with default vim settings
+let s:save_cpo = &cpo
 set cpo&vim
 
-let s:adapter_cmd = ['python3', expand("<sfile>:p:h") . '/vimwatcher.py']
+let s:nvim = has('nvim')
 
-function! s:StartVimWatcher()
-        if !exists("s:vimwatcher_job") || !s:CheckStatus()
-                if has('nvim')
-                        let s:vimwatcher_job = jobstart(s:adapter_cmd,
-                                    \ {"on_stdout": "AWNeovimEcho",
-                                    \  "on_stderr": "AWNeovimEcho",
-                                    \ })
-                else
-                        let s:vimwatcher_job = job_start(s:adapter_cmd,
-                                    \ {"out_cb": "AWEcho",
-                                    \  "err_cb": "AWEcho",
-                                    \  "in_mode": "raw"
-                                    \ })
-                endif
-        endif
+let s:last_heartbeat = localtime()
+let s:file = ''
+let s:language = ''
+let s:project = ''
+
+let s:connected = 0
+let s:base_apiurl = 'http://127.0.0.1:5600/api/0'
+let s:hostname = hostname()
+let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
+let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucketname)
+let s:heartbeat_apiurl = printf('%s/heartbeat?pulsetime=10', s:bucket_apiurl)
+
+" dict of all responses
+" the key is the jobid and the value the HTTP status code
+let s:http_response_code = {}
+
+function! HTTPPostJson(url, data)
+    let l:req = ['curl', '-s', a:url,
+        \ '-H', 'Content-Type: application/json',
+        \ '-X', 'POST',
+        \ '-d', json_encode(a:data),
+        \ '-o', '/dev/null',
+        \ '-w', "%{http_code}"]
+    if s:nvim
+        let l:req_job = jobstart(l:req,
+            \ {"on_stdout": "HTTPPostOnStdoutNeovim",
+            \  "on_exit": "HTTPPostOnExitNeovim",
+        \ })
+    else
+        let l:req_job = job_start(l:req,
+            \ {"out_cb": "HTTPPostOnStdoutVim",
+            \  "close_cb": "HTTPPostOnExitVim",
+            \  "in_mode": "raw",
+        \ })
+    endif
 endfunc
 
-function! AWNeovimEcho(job_id, data, event)
-        echo a:data
-endfunc
-function! AWEcho(channel, msg)
-        echo a:msg
-endfunc
-
-function! s:CheckStatus()
-        if has('nvim')
-                if s:vimwatcher_job
-                        return 1
-                endif
-        elseif ch_status(s:vimwatcher_job) == "open"
-                return 1
-        endif
-        return 0
+function! HTTPPostOnExitNeovim(jobid, exitcode, eventtype)
+    let l:jobid_str = printf('%d', a:jobid)
+    let l:status_code = str2nr(s:http_response_code[l:jobid_str][0])
+    call HTTPPostOnExit(l:jobid_str, l:status_code)
 endfunc
 
-function! s:StopVimWatcher()
-        if has('nvim')
-                call jobstop(s:vimwatcher_job)
-                let s:vimwatcher_job = 0
-        else
-                call job_stop(s:vimwatcher_job)
-        endif
+function! HTTPPostOnExitVim(jobmsg)
+    " cut out channelnum from string 'channel X running'
+    let l:jobid_str = substitute(a:jobmsg, '[ A-Za-z]*', '', "g")
+    let l:status_code = str2nr(s:http_response_code[l:jobid_str])
+    call HTTPPostOnExit(l:jobid_str, l:status_code)
 endfunc
 
-function! s:Send(msg)
-        if s:CheckStatus()
-                let l:json_msg = json_encode(a:msg)
-                if has('nvim')
-                        call jobsend(s:vimwatcher_job, l:json_msg . "\n")
-                else
-                        call ch_sendraw(s:vimwatcher_job, l:json_msg . "\n")
-                endif
-        endif
+function! HTTPPostOnExit(jobid_str, status_code)
+    if a:status_code == 0
+        " We cannot connect to aw-server
+        echoerr "aw-watcher-vim: Failed to connect to aw-server, logging will be disabled. You can retry to connect with ':AWStart'"
+        let s:connected = 0
+    elseif a:status_code >= 100 && a:status_code < 300 || a:status_code == 304
+        " We are connected!
+        let s:connected = 1
+    else
+        " aw-server didn't like our request
+        echoerr printf("aw-watcher-vim: aw-server did not accept our request with status code %d. See aw-server logs for reason or stop aw-watcher-vim with :AWStop", a:status_code)
+    endif
+    " Cleanup response code
+    unlet s:http_response_code[a:jobid_str]
 endfunc
 
-function! s:Poke()
-        call s:Send({
-        \   'action': 'update',
-        \   'data': {
-        \       'file': expand('%:p'),
-        \       'language': &filetype,
-        \       'project': getcwd()
-        \}})
+function! HTTPPostOnStdoutVim(jobmsg, data)
+    " cut out channelnum from string 'channel X running'
+    let l:jobid_str = substitute(a:jobmsg, '[ A-Za-z]*', '', "g")
+    let s:http_response_code[l:jobid_str] = a:data
+    "echo printf('aw-watcher-vim job %d stdout: %s', l:jobid_str, json_encode(a:data))
 endfunc
 
-call s:StartVimWatcher()
+function! HTTPPostOnStdoutNeovim(jobid, data, event)
+    if a:data != ['']
+        let l:jobid_str = printf('%d', a:jobid)
+        let s:http_response_code[l:jobid_str] = a:data
+        "echo printf('aw-watcher-vim job %d stdout: %s', a:jobid, json_encode(a:data))
+    endif
+endfunc
+
+function! s:CreateBucket()
+    let l:body = {
+        \ 'name': s:bucketname,
+        \ 'hostname': hostname(),
+        \ 'client': 'aw-watcher-vim',
+        \ 'type': 'app.editor'
+    \}
+    call HTTPPostJson(s:bucket_apiurl, l:body)
+endfunc
+
+function! s:Heartbeat()
+    " Only send heartbeats if we can connect to aw-server
+    if s:connected < 1
+        return
+    endif
+    let l:duration = 0
+    let l:localtime = localtime()
+    let l:timestamp = strftime('%FT%H:%M:%S%z')
+    let l:file = expand('%p')
+    let l:language = &filetype
+    let l:project = getcwd()
+    " Only send heartbeat if data was changed or more than 1 second has passed
+    " since last heartbeat
+    if    s:file != l:file ||
+        \ s:language != l:language ||
+        \ s:project != l:project ||
+        \ l:localtime - s:last_heartbeat > 1
+
+        let l:req_body = {
+            \ 'duration': 0,
+            \ 'timestamp': l:timestamp,
+            \ 'data': {
+                \ 'file': l:file,
+                \ 'language': l:language,
+                \ 'project': l:project
+            \ }
+        \}
+        call HTTPPostJson(s:heartbeat_apiurl, l:req_body)
+        let s:file = l:file
+        let s:language = l:language
+        let s:project = l:project
+        let s:last_heartbeat = l:localtime
+    endif
+endfunc
+
+function! AWStart()
+    call s:CreateBucket()
+endfunc
+
+function! AWStop()
+    let s:connected = 0
+endfunc
 
 augroup ActivityWatch
-        autocmd BufEnter * call s:StartVimWatcher()
-        autocmd CursorMoved,CursorMovedI * call s:Poke()
+    autocmd VimEnter * call AWStart()
+    autocmd BufEnter,CursorMoved,CursorMovedI * call s:Heartbeat()
 augroup END
 
-command! AWStart call s:StartVimWatcher()
-command! AWStatus echom s:CheckStatus()
-command! AWStop  call s:StopVimWatcher()
+command! AWHeartbeat call s:Heartbeat()
+command! AWStart call AWStart()
+command! AWStop call AWStop()
+command! AWStatus echom printf('aw-watcher-vim running: %b', s:connected)
 
-let &cpo = s:cpo_save
-unlet s:cpo_save
+" reset compatibility mode
+let &cpo = s:save_cpo
