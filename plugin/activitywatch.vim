@@ -95,7 +95,7 @@ function! s:CreateBucket()
         \ 'name': s:bucketname,
         \ 'hostname': hostname(),
         \ 'client': 'aw-watcher-vim',
-        \ 'type': 'app.editor'
+        \ 'type': 'app.editor.activity'
     \}
     call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
