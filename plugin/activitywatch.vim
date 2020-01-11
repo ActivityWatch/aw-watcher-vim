@@ -146,6 +146,8 @@ endfunc
 augroup ActivityWatch
     autocmd VimEnter * call AWStart()
     autocmd BufEnter,CursorMoved,CursorMovedI * call s:Heartbeat()
+    autocmd CmdlineEnter,CmdlineChanged * call s:Heartbeat()
+    autocmd VimSuspend,VimResume * call s:Heartbeat()
 augroup END
 
 command! AWHeartbeat call s:Heartbeat()
