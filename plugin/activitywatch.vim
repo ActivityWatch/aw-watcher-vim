@@ -19,7 +19,7 @@ let s:base_apiurl = 'http://127.0.0.1:5600/api/0'
 let s:hostname = hostname()
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
 let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucketname)
-let s:heartbeat_apiurl = printf('%s/heartbeat?pulsetime=10', s:bucket_apiurl)
+let s:heartbeat_apiurl = printf('%s/heartbeat?pulsetime=30', s:bucket_apiurl)
 
 " dict of all responses
 " the key is the jobid and the value the HTTP status code
