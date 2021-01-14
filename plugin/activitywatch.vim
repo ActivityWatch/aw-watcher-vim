@@ -15,7 +15,9 @@ let s:language = ''
 let s:project = ''
 
 let s:connected = 0
-let s:base_apiurl = 'http://127.0.0.1:5600/api/0'
+let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
+let s:apiurl_port = get(g:, 'aw_apiurl_port', '5600')
+let s:base_apiurl = printf('http://%s:%s/api/0', s:apiurl_host, s:apiurl_port)
 let s:hostname = hostname()
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
 let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucketname)
