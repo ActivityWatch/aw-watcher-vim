@@ -20,3 +20,12 @@ Once installed in the bundle directory, it should load automatically if you have
 ```
 
 If aw-watcher-vim loses connection it will give you an error message and stop logging. You then need to either run :AWStart or restart vim to start logging again
+
+### Configuration
+
+The following global variables are available:
+
+| Variable Name      | Description                    | Default Value |
+|--------------------|--------------------------------|---------------|
+| `g:aw_apiurl_host` | Sets the _host_ of the Api Url | `127.0.0.1`   |
+| `g:aw_apiurl_port` | Sets the _port_ of the Api Url | `5600`        |
