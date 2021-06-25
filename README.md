@@ -3,7 +3,7 @@ aw-watcher-vim
 
 ### Installation
 
-This plugin depends on curl, so make sure that it's installed and available in yout PATH
+This plugin depends on curl, so make sure that it's installed and available in your PATH
 
 It is recommended to have a vim runtime manager to make it easier to install (such as Pathogen or Vundle)
 
