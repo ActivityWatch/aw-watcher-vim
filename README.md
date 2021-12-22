@@ -25,7 +25,8 @@ If aw-watcher-vim loses connection it will give you an error message and stop lo
 
 The following global variables are available:
 
-| Variable Name      | Description                    | Default Value |
-|--------------------|--------------------------------|---------------|
-| `g:aw_apiurl_host` | Sets the _host_ of the Api Url | `127.0.0.1`   |
-| `g:aw_apiurl_port` | Sets the _port_ of the Api Url | `5600`        |
+| Variable Name      | Description                                    | Default Value |
+|--------------------|------------------------------------------------|---------------|
+| `g:aw_apiurl_host` | Sets the _host_ of the Api Url                 | `127.0.0.1`   |
+| `g:aw_apiurl_port` | Sets the _port_ of the Api Url                 | `5600`        |
+| `g:aw_api_timeout` | Sets the _timeout_ seconds of the Api request  | `2.0`         |

@@ -17,6 +17,7 @@ let s:project = ''
 let s:connected = 0
 let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
 let s:apiurl_port = get(g:, 'aw_apiurl_port', '5600')
+let s:api_timeout = get(g:, 'aw_api_timeout', 2)
 let s:base_apiurl = printf('http://%s:%s/api/0', s:apiurl_host, s:apiurl_port)
 let s:hostname = hostname()
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
@@ -33,10 +34,12 @@ function! HTTPPostJson(url, data)
         \ '-X', 'POST',
         \ '-d', json_encode(a:data),
         \ '-o', '/dev/null',
+        \ '-m', s:api_timeout,
         \ '-w', "%{http_code}"]
     if s:nvim
         let l:req_job = jobstart(l:req,
-            \ {"on_stdout": "HTTPPostOnStdoutNeovim",
+            \ {"detach": 1,
+            \  "on_stdout": "HTTPPostOnStdoutNeovim",
             \  "on_exit": "HTTPPostOnExitNeovim",
         \ })
     else
