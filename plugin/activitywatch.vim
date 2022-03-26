@@ -109,7 +109,7 @@ endfunc
 function! s:GetGitBranch()
     let l:cmd_result = systemlist('git branch --show-current')[0]
     let l:is_git_repo = (cmd_result =~ '^fatal: ') ? 0 : 1
-    if cmd_result
+    if is_git_repo
         return cmd_result
     else
         return 'N/A'
