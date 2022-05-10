@@ -13,6 +13,7 @@ let s:last_heartbeat = localtime()
 let s:file = ''
 let s:language = ''
 let s:project = ''
+let s:branch = ''
 
 let s:connected = 0
 let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
@@ -105,6 +106,16 @@ function! s:CreateBucket()
     call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
 
+function! s:GetGitBranch()
+    let l:cmd_result = systemlist('git branch --show-current')[0]
+    let l:is_git_repo = (cmd_result =~ '^fatal: ') ? 0 : 1
+    if is_git_repo
+        return cmd_result
+    else
+        return 'N/A'
+    endif
+endfunc
+
 function! s:Heartbeat()
     " Only send heartbeats if we can connect to aw-server
     if s:connected < 1
@@ -116,11 +127,13 @@ function! s:Heartbeat()
     let l:file = expand('%p')
     let l:language = &filetype
     let l:project = getcwd()
+    let l:branch = s:GetGitBranch()
     " Only send heartbeat if data was changed or more than 1 second has passed
     " since last heartbeat
     if    s:file != l:file ||
         \ s:language != l:language ||
         \ s:project != l:project ||
+        \ s:branch != l:branch ||
         \ l:localtime - s:last_heartbeat > 1
 
         let l:req_body = {
@@ -129,13 +142,15 @@ function! s:Heartbeat()
             \ 'data': {
                 \ 'file': l:file,
                 \ 'language': l:language,
-                \ 'project': l:project
+                \ 'project': l:project,
+                \ 'branch': l:branch
             \ }
         \}
         call HTTPPostJson(s:heartbeat_apiurl, l:req_body)
         let s:file = l:file
         let s:language = l:language
         let s:project = l:project
+        let s:branch = l:branch
         let s:last_heartbeat = l:localtime
     endif
 endfunc
