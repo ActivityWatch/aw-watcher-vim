@@ -10,6 +10,7 @@ set cpo&vim
 let s:nvim = has('nvim')
 
 let s:last_heartbeat = localtime()
+let s:last_branch_check = localtime()
 let s:file = ''
 let s:language = ''
 let s:project = ''
@@ -106,14 +107,19 @@ function! s:CreateBucket()
     call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
 
-function! s:GetGitBranch()
-    let l:cmd_result = systemlist('git branch --show-current')[0]
-    let l:is_git_repo = (cmd_result =~ '^fatal: ') ? 0 : 1
-    if is_git_repo
-        return cmd_result
-    else
-        return 'N/A'
+function! s:GetGitBranch(localtime)
+    if   a:localtime - s:last_branch_check > 5 ||
+       \ s:branch == ''
+        let l:cmd_result = systemlist('git branch --show-current')[0]
+        let l:is_git_repo = (cmd_result =~ '^fatal: ') ? 0 : 1
+        let s:last_branch_check = a:localtime
+        if is_git_repo
+            return cmd_result
+        else
+            return 'N/A'
+        endif
     endif
+    return s:branch
 endfunc
 
 function! s:Heartbeat()
@@ -127,14 +133,15 @@ function! s:Heartbeat()
     let l:file = expand('%p')
     let l:language = &filetype
     let l:project = getcwd()
+    let l:branch = s:GetGitBranch(l:localtime)
     " Only send heartbeat if data was changed or more than 1 second has passed
     " since last heartbeat
     if    s:file != l:file ||
         \ s:language != l:language ||
         \ s:project != l:project ||
+        \ s:branch != l:branch ||
         \ l:localtime - s:last_heartbeat > 1
-        " Only get branch if heartbeat is to be sent
-        let l:branch = s:GetGitBranch()
+
         let l:req_body = {
             \ 'duration': 0,
             \ 'timestamp': l:timestamp,
