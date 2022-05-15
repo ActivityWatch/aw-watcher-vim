@@ -127,15 +127,14 @@ function! s:Heartbeat()
     let l:file = expand('%p')
     let l:language = &filetype
     let l:project = getcwd()
-    let l:branch = s:GetGitBranch()
     " Only send heartbeat if data was changed or more than 1 second has passed
     " since last heartbeat
     if    s:file != l:file ||
         \ s:language != l:language ||
         \ s:project != l:project ||
-        \ s:branch != l:branch ||
         \ l:localtime - s:last_heartbeat > 1
-
+        " Only get branch if heartbeat is to be sent
+        let l:branch = s:GetGitBranch()
         let l:req_body = {
             \ 'duration': 0,
             \ 'timestamp': l:timestamp,
