@@ -10,7 +10,7 @@ set cpo&vim
 let s:nvim = has('nvim')
 
 let s:last_heartbeat = localtime()
-let s:last_branch_check = localtime()
+let s:last_branch_update = 0
 let s:file = ''
 let s:language = ''
 let s:project = ''
@@ -108,11 +108,10 @@ function! s:CreateBucket()
 endfunc
 
 function! s:GetGitBranch(localtime)
-    if   a:localtime - s:last_branch_check > 5 ||
-       \ s:branch == ''
+    if a:localtime - s:last_branch_update > 5
         let l:cmd_result = systemlist('git branch --show-current')[0]
         let l:is_git_repo = (cmd_result =~ '^fatal: ') ? 0 : 1
-        let s:last_branch_check = a:localtime
+        let s:last_branch_update = a:localtime
         if is_git_repo
             return cmd_result
         else
