@@ -10,10 +10,12 @@ set cpo&vim
 let s:nvim = has('nvim')
 
 let s:last_heartbeat = localtime()
-let s:last_branch_update = 0
 let s:file = ''
 let s:language = ''
 let s:project = ''
+
+let s:last_branch_update = 0
+let s:is_changed_branch = 0
 let s:branch = ''
 
 let s:connected = 0
@@ -107,18 +109,15 @@ function! s:CreateBucket()
     call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
 
-function! s:GetGitBranch(localtime)
+function! s:RefreshGitBranch(localtime)
     if a:localtime - s:last_branch_update > 5
-        let l:cmd_result = systemlist('git branch --show-current')[0]
-        let l:is_git_repo = (cmd_result =~ '^fatal: ') ? 0 : 1
         let s:last_branch_update = a:localtime
-        if is_git_repo
-            return cmd_result
-        else
-            return 'N/A'
-        endif
+        let l:cmd_result = systemlist('git branch --show-current')[0]
+        let l:current_branch = (cmd_result =~ '^fatal: ') ? 'N/A' : cmd_result
+        let s:is_changed_branch = l:current_branch == s:branch ? 0 : 1
+        let s:branch = l:current_branch
     endif
-    return s:branch
+    "echo printf('branch %d is_changed_branch %s', s:branch, s:is_changed_branch)
 endfunc
 
 function! s:Heartbeat()
@@ -132,13 +131,13 @@ function! s:Heartbeat()
     let l:file = expand('%p')
     let l:language = &filetype
     let l:project = getcwd()
-    let l:branch = s:GetGitBranch(l:localtime)
+    call s:RefreshGitBranch(l:localtime)
     " Only send heartbeat if data was changed or more than 1 second has passed
     " since last heartbeat
     if    s:file != l:file ||
         \ s:language != l:language ||
         \ s:project != l:project ||
-        \ s:branch != l:branch ||
+        \ s:is_changed_branch == 1 ||
         \ l:localtime - s:last_heartbeat > 1
 
         let l:req_body = {
@@ -148,20 +147,20 @@ function! s:Heartbeat()
                 \ 'file': l:file,
                 \ 'language': l:language,
                 \ 'project': l:project,
-                \ 'branch': l:branch
+                \ 'branch': s:branch
             \ }
         \}
         call HTTPPostJson(s:heartbeat_apiurl, l:req_body)
         let s:file = l:file
         let s:language = l:language
         let s:project = l:project
-        let s:branch = l:branch
         let s:last_heartbeat = l:localtime
     endif
 endfunc
 
 function! AWStart()
     call s:CreateBucket()
+    call s:RefreshGitBranch(localtime())
 endfunc
 
 function! AWStop()
