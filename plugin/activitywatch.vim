@@ -98,7 +98,7 @@ endfunc
 function! s:CreateBucket()
     let l:body = {
         \ 'name': s:bucketname,
-        \ 'hostname': hostname(),
+        \ 'hostname': s:hostname,
         \ 'client': 'aw-watcher-vim',
         \ 'type': 'app.editor.activity'
     \}
