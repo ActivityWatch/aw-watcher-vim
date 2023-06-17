@@ -23,7 +23,7 @@ let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
 let s:apiurl_port = get(g:, 'aw_apiurl_port', '5600')
 let s:api_timeout = get(g:, 'aw_api_timeout', 2)
 let s:base_apiurl = printf('http://%s:%s/api/0', s:apiurl_host, s:apiurl_port)
-let s:hostname = hostname()
+let s:hostname = get(g:, 'aw_hostname', hostname())
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
 let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucketname)
 let s:heartbeat_apiurl = printf('%s/heartbeat?pulsetime=30', s:bucket_apiurl)
@@ -102,7 +102,7 @@ endfunc
 function! s:CreateBucket()
     let l:body = {
         \ 'name': s:bucketname,
-        \ 'hostname': hostname(),
+        \ 'hostname': s:hostname,
         \ 'client': 'aw-watcher-vim',
         \ 'type': 'app.editor.activity'
     \}
@@ -128,9 +128,9 @@ function! s:Heartbeat()
     let l:duration = 0
     let l:localtime = localtime()
     let l:timestamp = strftime('%FT%H:%M:%S%z')
-    let l:file = expand('%p')
+    let l:file = expand('%:p')
     let l:language = &filetype
-    let l:project = getcwd()
+    let l:project = expand('%:p:h')
     call s:RefreshGitBranch(l:localtime)
     " Only send heartbeat if data was changed or more than 1 second has passed
     " since last heartbeat
