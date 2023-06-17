@@ -109,15 +109,25 @@ function! s:CreateBucket()
     call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
 
+function! s:GitBranchOnStdout(jobid, data, event)
+    if a:data != ['']
+        let l:current_branch = a:data[0]
+        let s:is_changed_branch = current_branch == s:branch ? 0 : 1
+        let s:branch = current_branch
+    endif
+endfunc
+
+function! s:GitBranchOnExit(jobid, exitcode, eventtype)
+    if a:exitcode != 0
+        let s:branch = 'N/A'
+    endif
+endfunc
+
 function! s:RefreshGitBranch(localtime)
     if a:localtime - s:last_branch_update > 5
         let s:last_branch_update = a:localtime
-        let l:cmd_result = systemlist('git branch --show-current')[0]
-        let l:current_branch = (cmd_result =~ '^fatal: ') ? 'N/A' : cmd_result
-        let s:is_changed_branch = l:current_branch == s:branch ? 0 : 1
-        let s:branch = l:current_branch
+        let l:cmd_result = jobstart('git branch --show-current', {'on_stdout': 's:GitBranchOnStdout', 'on_exit': 's:GitBranchOnExit'})
     endif
-    "echo printf('branch %d is_changed_branch %s', s:branch, s:is_changed_branch)
 endfunc
 
 function! s:Heartbeat()
