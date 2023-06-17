@@ -119,7 +119,7 @@ endfunc
 
 function! s:GitBranchOnExit(jobid, exitcode, eventtype)
     if a:exitcode != 0
-        let s:branch = 'N/A'
+        let s:branch = ''
     endif
 endfunc
 
@@ -156,10 +156,12 @@ function! s:Heartbeat()
             \ 'data': {
                 \ 'file': l:file,
                 \ 'language': l:language,
-                \ 'project': l:project,
-                \ 'branch': s:branch
+                \ 'project': l:project
             \ }
         \}
+        if s:branch != ''
+            let l:req_body['data']['branch'] = s:branch
+        endif
         call HTTPPostJson(s:heartbeat_apiurl, l:req_body)
         let s:file = l:file
         let s:language = l:language
