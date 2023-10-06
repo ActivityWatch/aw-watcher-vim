@@ -14,6 +14,10 @@ let s:file = ''
 let s:language = ''
 let s:project = ''
 
+let s:last_branch_update = 0
+let s:is_changed_branch = 0
+let s:branch = ''
+
 let s:connected = 0
 let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
 let s:apiurl_port = get(g:, 'aw_apiurl_port', '5600')
@@ -105,6 +109,27 @@ function! s:CreateBucket()
     call HTTPPostJson(s:bucket_apiurl, l:body)
 endfunc
 
+function! s:GitBranchOnStdout(jobid, data, event)
+    if a:data != ['']
+        let l:current_branch = a:data[0]
+        let s:is_changed_branch = current_branch == s:branch ? 0 : 1
+        let s:branch = current_branch
+    endif
+endfunc
+
+function! s:GitBranchOnExit(jobid, exitcode, eventtype)
+    if a:exitcode != 0
+        let s:branch = ''
+    endif
+endfunc
+
+function! s:RefreshGitBranch(localtime)
+    if a:localtime - s:last_branch_update > 5
+        let s:last_branch_update = a:localtime
+        let l:cmd_result = jobstart('git branch --show-current', {'on_stdout': 's:GitBranchOnStdout', 'on_exit': 's:GitBranchOnExit'})
+    endif
+endfunc
+
 function! s:Heartbeat()
     " Only send heartbeats if we can connect to aw-server
     if s:connected < 1
@@ -116,11 +141,13 @@ function! s:Heartbeat()
     let l:file = expand('%:p')
     let l:language = &filetype
     let l:project = expand('%:p:h')
+    call s:RefreshGitBranch(l:localtime)
     " Only send heartbeat if data was changed or more than 1 second has passed
     " since last heartbeat
     if    s:file != l:file ||
         \ s:language != l:language ||
         \ s:project != l:project ||
+        \ s:is_changed_branch == 1 ||
         \ l:localtime - s:last_heartbeat > 1
 
         let l:req_body = {
@@ -132,6 +159,9 @@ function! s:Heartbeat()
                 \ 'project': l:project
             \ }
         \}
+        if s:branch != ''
+            let l:req_body['data']['branch'] = s:branch
+        endif
         call HTTPPostJson(s:heartbeat_apiurl, l:req_body)
         let s:file = l:file
         let s:language = l:language
@@ -142,6 +172,7 @@ endfunc
 
 function! AWStart()
     call s:CreateBucket()
+    call s:RefreshGitBranch(localtime())
 endfunc
 
 function! AWStop()
