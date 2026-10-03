@@ -27,7 +27,28 @@ The following global variables are available:
 
 | Variable Name      | Description                                    | Default Value |
 |--------------------|------------------------------------------------|---------------|
-| `g:aw_apiurl_host` | Sets the _host_ of the Api Url                 | `127.0.0.1`   |
+| `g:aw_apiurl_host` | Sets the _host_ of the Api Url                 | `'127.0.0.1'` |
 | `g:aw_apiurl_port` | Sets the _port_ of the Api Url                 | `5600`        |
 | `g:aw_api_timeout` | Sets the _timeout_ seconds of the Api request  | `2.0`         |
 | `g:aw_hostname`    | Overides the default hostname                  | `hostname()`  |
+
+Set configuration before the plugin loads. Quote the host in your vimrc:
+
+```vim
+let g:aw_apiurl_host = '127.0.0.1'
+let g:aw_apiurl_port = 5600
+let g:aw_api_timeout = 2
+```
+
+Vim interprets an unquoted `127.0.0.1` as concatenation and produces `127001`.
+
+### Connection troubleshooting
+
+Use `:messages` to inspect a connection failure. The message includes the
+requested URL and curl's diagnostic; `000` means no HTTP response was received.
+Check that ActivityWatch is running and that the URL uses the configured host
+and port. After correcting the configuration, reload the plugin by restarting
+the editor. If only the server was stopped, start it and run `:AWStart` to retry.
+
+The heartbeat endpoint accepts a JSON **POST** request. Visiting its URL in a
+browser or with a plain `curl URL` sends a GET; that does not test heartbeats.
