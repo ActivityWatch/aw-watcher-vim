@@ -35,7 +35,7 @@ class HTTPJobsTest(unittest.TestCase):
         if not EDITORS:
             self.skipTest("Vim or Neovim is required")
 
-    def run_editor(self, editor, port, curl_script=None):
+    def run_editor(self, editor, port, curl_script=None, api_timeout="1"):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             result = root / "result.json"
@@ -46,7 +46,7 @@ class HTTPJobsTest(unittest.TestCase):
                         "set nomore",
                         "let g:aw_apiurl_host = '127.0.0.1'",
                         f"let g:aw_apiurl_port = {port}",
-                        "let g:aw_api_timeout = 1",
+                        f"let g:aw_api_timeout = {api_timeout}",
                         "let g:aw_hostname = 'http-job-test'",
                         f"source {PLUGIN}",
                         "AWStart",
@@ -113,6 +113,17 @@ class HTTPJobsTest(unittest.TestCase):
                 )
                 self.assertIn("running: 1", result["status"])
                 self.assertEqual("", result["error"])
+
+    def test_float_api_timeout_starts_plugin(self):
+        # The README documents `2.0`; a Float in the job argv used to raise E806.
+        # Succeed only when curl receives the timeout as the plain value `0.5`.
+        curl = '#!/bin/sh\ncase "$*" in *"-m 0.5 "*) printf 200;; esac\n'
+        for editor in EDITORS:
+            for value in ("0.5", "'0.5'"):
+                with self.subTest(editor=editor, value=value):
+                    result = self.run_editor(editor, 5600, curl, api_timeout=value)
+                    self.assertNotIn("E806", result["messages"])
+                    self.assertIn("running: 1", result["status"])
 
     def test_http_success_and_rejection(self):
         for status in (201, 503):

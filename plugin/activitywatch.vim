@@ -18,6 +18,10 @@ let s:connected = 0
 let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
 let s:apiurl_port = get(g:, 'aw_apiurl_port', '5600')
 let s:api_timeout = get(g:, 'aw_api_timeout', 2)
+if type(s:api_timeout) == type(0.0)
+    " Job argv items must be strings or numbers; a Float raises E806.
+    let s:api_timeout = string(s:api_timeout)
+endif
 let s:base_apiurl = printf('http://%s:%s/api/0', s:apiurl_host, s:apiurl_port)
 let s:hostname = get(g:, 'aw_hostname', hostname())
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
