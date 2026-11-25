@@ -19,20 +19,65 @@ let s:apiurl_host = get(g:, 'aw_apiurl_host', '127.0.0.1')
 let s:apiurl_port = get(g:, 'aw_apiurl_port', '5600')
 let s:api_timeout = get(g:, 'aw_api_timeout', 2)
 let s:base_apiurl = printf('http://%s:%s/api/0', s:apiurl_host, s:apiurl_port)
+" Percent-encode everything in a bucket id that is not RFC 3986 "unreserved".
+" Non-ASCII characters are left as-is: they are valid UTF-8 path data, and
+" char2nr() would give their codepoint rather than their encoded bytes.
+function! s:UrlEscapeChar(char) abort
+    return char2nr(a:char) > 127 ? a:char : printf('%%%02X', char2nr(a:char))
+endfunc
+
+function! s:UrlEncode(str) abort
+    return substitute(a:str, '[^A-Za-z0-9._~-]', '\=s:UrlEscapeChar(submatch(0))', 'g')
+endfunc
+
 let s:hostname = get(g:, 'aw_hostname', hostname())
 let s:bucketname = printf('aw-watcher-vim_%s', s:hostname)
-let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucketname)
+" Bucket ids are URL path segments, so any character curl would treat as
+" structure (space, /, ?, #, %) has to be percent-encoded in the URL. The id
+" itself stays raw in the create payload and in the stored data.
+let s:bucket_urlname = s:UrlEncode(s:bucketname)
+let s:bucket_apiurl = printf('%s/buckets/%s', s:base_apiurl, s:bucket_urlname)
 let s:heartbeat_apiurl = printf('%s/heartbeat?pulsetime=30', s:bucket_apiurl)
 
 " dict of all responses
 " the key is the jobid and the value the HTTP status code
 let s:http_response_code = {}
 
-function! HTTPPostJson(url, data)
+" json_encode() raises E474 on a string holding bytes that are not valid UTF-8
+" (Neovim; Vim substitutes U+FFFD). Without a guard the failing `let` leaves an
+" empty `-d ''` in the list and curl posts an empty body, which the server
+" rejects with 400 and the heartbeat is lost silently. Encode the payload with
+" strtrans()'d strings instead, so the heartbeat is recorded with the offending
+" bytes escaped (e.g. "caf<e9>.txt") rather than dropped.
+function! s:StrtransDeep(value) abort
+    let l:type = type(a:value)
+    if l:type == type('')
+        return strtrans(a:value)
+    elseif l:type == type([])
+        return map(copy(a:value), {_, v -> s:StrtransDeep(v)})
+    elseif l:type == type({})
+        let l:out = {}
+        for [l:key, l:val] in items(a:value)
+            let l:out[s:StrtransDeep(l:key)] = s:StrtransDeep(l:val)
+        endfor
+        return l:out
+    endif
+    return a:value
+endfunc
+
+function! s:JsonEncode(data) abort
+    try
+        return json_encode(a:data)
+    catch /E474/
+        return json_encode(s:StrtransDeep(a:data))
+    endtry
+endfunc
+
+function! HTTPPostJson(url, data) abort
     let l:req = ['curl', '-s', a:url,
         \ '-H', 'Content-Type: application/json',
         \ '-X', 'POST',
-        \ '-d', json_encode(a:data),
+        \ '-d', s:JsonEncode(a:data),
         \ '-o', '/dev/null',
         \ '-m', s:api_timeout,
         \ '-w', "%{http_code}"]
